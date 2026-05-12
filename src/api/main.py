@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from langchain.messages import AIMessageChunk
 from sse_starlette.sse import EventSourceResponse
 
 from src.agents import graph, load_sample_data
@@ -78,7 +79,7 @@ async def stream_query(request: QueryRequest):
         ):
             if chunk["type"] == "messages":
                 msg, metadata = chunk["data"]
-                if msg.content:
+                if isinstance(msg, AIMessageChunk) and msg.content:
                     yield {
                         "event": "message",
                         "data": msg.content,

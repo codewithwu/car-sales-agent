@@ -67,6 +67,81 @@
             border-bottom-left-radius: 4px;
         }
 
+        .welcome-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 16px;
+        }
+
+        .welcome-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 12px;
+        }
+
+        .welcome-desc {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .data-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+
+        .data-info-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .data-info-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .data-tag {
+            background: #e8f4f8;
+            color: #2980b9;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .examples-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .examples-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .example-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .example-btn:hover {
+            background: #2980b9;
+        }
+
         .typing-indicator {
             align-self: flex-start;
             background: white;
@@ -139,7 +214,38 @@
 <body>
     <div class="header">汽车销售数据分析助手</div>
 
-    <div class="chat-container" id="chatContainer"></div>
+    <div class="chat-container" id="chatContainer">
+        <div class="welcome-container">
+            <div class="welcome-title">👋 您好，我是汽车销售数据分析助手</div>
+            <div class="welcome-desc">
+                我可以帮您查询汽车销售数据，包括车辆信息、销售员业绩等。只需用自然语言提问即可！
+            </div>
+
+            <div class="data-info">
+                <div class="data-info-title">📊 可查询的数据字段</div>
+                <div class="data-info-tags">
+                    <span class="data-tag">品牌</span>
+                    <span class="data-tag">车型</span>
+                    <span class="data-tag">颜色</span>
+                    <span class="data-tag">价格</span>
+                    <span class="data-tag">年份</span>
+                    <span class="data-tag">里程</span>
+                    <span class="data-tag">排量</span>
+                    <span class="data-tag">油耗</span>
+                    <span class="data-tag">销售员</span>
+                </div>
+            </div>
+
+            <div class="examples-title">💡 试试这样问我</div>
+            <div class="examples-container">
+                <button class="example-btn" onclick="askQuestion('丰田轿车有哪些？')">丰田轿车有哪些？</button>
+                <button class="example-btn" onclick="askQuestion('红色SUV有哪些？')">红色SUV有哪些？</button>
+                <button class="example-btn" onclick="askQuestion('价格在5万到8万之间有哪些？')">价格在5万到8万之间有哪些？</button>
+                <button class="example-btn" onclick="askQuestion('哪个销售员卖得最多？')">哪个销售员卖得最多？</button>
+                <button class="example-btn" onclick="askQuestion('宝马的价格')">宝马的价格</button>
+            </div>
+        </div>
+    </div>
 
     <div class="input-container">
         <input type="text" id="messageInput" placeholder="请输入您的问题..." onkeypress="handleKeyPress(event)">
@@ -151,7 +257,8 @@
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
 
-        let conversationHistory = [];
+        let currentAssistantDiv = null;
+        let welcomeShown = true;
 
         function handleKeyPress(event) {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -160,40 +267,74 @@
             }
         }
 
+        function askQuestion(question) {
+            messageInput.value = question;
+            sendMessage();
+        }
+
         async function sendMessage() {
             const message = messageInput.value.trim();
             if (!message) return;
+
+            // 如果是第一次发送，移除欢迎信息
+            if (welcomeShown) {
+                const welcome = document.querySelector('.welcome-container');
+                if (welcome) welcome.remove();
+                welcomeShown = false;
+            }
 
             // 添加用户消息
             addMessage(message, 'user');
             messageInput.value = '';
             setLoading(true);
 
-            // 添加加载动画
-            const typingId = addTypingIndicator();
+            // 创建助手消息容器（用于流式输出）
+            currentAssistantDiv = document.createElement('div');
+            currentAssistantDiv.className = 'message assistant-message';
+            chatContainer.appendChild(currentAssistantDiv);
 
             try {
-                const response = await fetch('/query', {
+                const response = await fetch('/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query: message })
                 });
 
-                const data = await response.json();
-                removeTypingIndicator(typingId);
-
-                if (response.ok) {
-                    addMessage(data.answer, 'assistant');
-                    conversationHistory.push({ role: 'user', content: message });
-                    conversationHistory.push({ role: 'assistant', content: data.answer });
-                } else {
-                    addMessage('抱歉，服务出现问题，请稍后重试。', 'error');
+                if (!response.ok) {
+                    currentAssistantDiv.textContent = '抱歉，服务出现问题，请稍后重试。';
+                    return;
                 }
+
+                // 读取 SSE 流
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullContent = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    // 解析 SSE 格式: event: message\ndata: xxx\n\n
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data:')) {
+                            const data = line.slice(5).trim();
+                            if (data) {
+                                fullContent += data;
+                                currentAssistantDiv.textContent = fullContent;
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            }
+                        }
+                    }
+                }
+
             } catch (error) {
-                removeTypingIndicator(typingId);
-                addMessage('网络错误，请检查服务是否运行。', 'error');
+                currentAssistantDiv.textContent = '网络错误，请检查服务是否运行。';
+                currentAssistantDiv.className = 'message error-message';
             } finally {
                 setLoading(false);
+                currentAssistantDiv = null;
             }
         }
 
@@ -203,22 +344,6 @@
             messageDiv.textContent = content;
             chatContainer.appendChild(messageDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function addTypingIndicator() {
-            const id = 'typing-' + Date.now();
-            const typingDiv = document.createElement('div');
-            typingDiv.id = id;
-            typingDiv.className = 'typing-indicator';
-            typingDiv.innerHTML = '<span></span><span></span><span></span>';
-            chatContainer.appendChild(typingDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            return id;
-        }
-
-        function removeTypingIndicator(id) {
-            const element = document.getElementById(id);
-            if (element) element.remove();
         }
 
         function setLoading(loading) {
