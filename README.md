@@ -111,6 +111,8 @@ uv run python src/main.py
 - 聊天界面：http://localhost:8000
 - API 接口：http://localhost:8000/docs
 
+![聊天界面截图](image.png)
+
 ### 4. API 调用示例
 
 ```bash
